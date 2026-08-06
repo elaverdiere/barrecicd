@@ -53,15 +53,38 @@ public enum Derivation {
             return Presentation(badge: state, title: run.project,
                                 tooltip: "\(run.project): \(why)", rows: rows)
         }
+        // THE BADGE STAYS GREY, AND THE MENU STILL SHOWS WHAT IT KNOWS.
+        //
+        // Owner's decision, 2026-08-06, after watching it grey on his own machine: the colour must
+        // keep meaning "nothing is watching THIS commit" — that signal is the product — but hiding
+        // the last run's table underneath it throws away the only information available at exactly
+        // the moment it is wanted. He is right, and the two are not in tension: the note says the
+        // tip is uncovered, so the table below it cannot be misread as a verdict on the tip.
+        //
+        // This is a frequent state, not an exotic one. A pipeline with `paths-ignore` will not run
+        // for a documentation or tooling commit — deliberately — so the branch tip legitimately has
+        // no run of its own for long stretches, and a menu that went blank each time would train
+        // its reader to stop opening it.
         if !tipHasRun {
             let short = String(run.tipSHA.prefix(8))
-            rows.append(MenuRow(kind: .note, label: "no run yet for \(short) — nothing is watching this commit"))
-            return Presentation(badge: state, title: run.project,
-                                tooltip: "\(run.project): the branch tip \(short) has no run of its own", rows: rows)
+            if run.number == nil {
+                // Still names the commit. F01-AC2 requires the tooltip to say WHICH of the two grey
+                // causes applies and never to guess — and a caller who is told "no run at all"
+                // without being told about what has learned only half of it.
+                rows.append(MenuRow(kind: .note, label: "no run at all on this branch — nothing has ever watched \(short)"))
+                return Presentation(badge: state, title: run.project,
+                                    tooltip: "\(run.project): the branch tip \(short) has no run at all", rows: rows)
+            }
+            rows.append(MenuRow(kind: .note, label: "tip \(short) is covered by no run"))
+            rows.append(MenuRow(kind: .note,
+                                label: "last run #\(run.number.map(String.init) ?? "?") on \(String(run.headSHA.prefix(8))) — \(run.status.rawValue)"))
         }
 
         // F04-AC3: a ledger belongs to ONE run. Pairing a live run number with a previous run's
         // verdicts shipped once and is worse than showing nothing, because it is confidently wrong.
+        // Note this compares against the RUN's head, never the branch tip — which is what lets the
+        // table above still appear when the tip is uncovered: the ledger and the run agree with
+        // each other, and it is the tip that has moved on.
         if let ledger, !ledger.sha.isEmpty, !sameCommit(ledger.sha, run.headSHA) {
             rows.append(MenuRow(kind: .note,
                                 label: "waiting for run \(run.number.map(String.init) ?? "?") — the ledger on disk is for \(String(ledger.sha.prefix(8)))"))
@@ -69,8 +92,16 @@ public enum Derivation {
             rows.append(contentsOf: gateRows(ledger, now: now))
         }
 
-        let title = run.number.map { "#\($0)" } ?? run.project
-        return Presentation(badge: state, title: title, tooltip: tooltipFor(run), rows: rows)
+        // The bar shows the run number only when that run actually covers the branch tip. Wearing
+        // "#844" beside a grey dot would suggest 844 has something to say about the code in the
+        // editor, which is the precise confusion the grey exists to prevent.
+        let title = tipHasRun ? (run.number.map { "#\($0)" } ?? run.project) : run.project
+        // Built without reusing `tooltipFor`, which carries its own "project:" prefix and produced
+        // the project name twice in one sentence.
+        let tooltip = tipHasRun ? tooltipFor(run)
+            : "\(run.project): tip \(String(run.tipSHA.prefix(8))) has no run of its own — "
+              + "the last one, #\(run.number.map(String.init) ?? "?") on \(String(run.headSHA.prefix(8))), is \(run.status.rawValue)"
+        return Presentation(badge: state, title: title, tooltip: tooltip, rows: rows)
     }
 
     /// The gate table, ordered by WHEN EACH GATE ACTUALLY RAN.
@@ -141,16 +172,22 @@ public enum Derivation {
         var rows: [MenuRow] = []
         var badges: [BadgeState] = []
         var titles: [String] = []
+        var tooltips: [String] = []
 
         for (run, ledger) in results {
             let p = derive(run: run, ledger: ledger, now: now, showHeading: several)
             badges.append(p.badge)
             titles.append(p.title)
+            // Each project's OWN tooltip, not one recomputed here. Recomputing it silently dropped
+            // every nuance `derive` had just established — an uncovered branch tip, a refused token
+            // — and left the hover text asserting a plain verdict the badge itself was refusing to
+            // show. Two answers to one question, from the same object.
+            tooltips.append(p.tooltip)
             rows.append(contentsOf: p.rows)
         }
         let worst = BadgeState.worst(badges)
         let title = several ? "\(results.count) projects" : (titles.first ?? "")
-        let tooltip = results.map { tooltipFor($0.0) }.joined(separator: "\n")
-        return Presentation(badge: worst, title: title, tooltip: tooltip, rows: rows)
+        return Presentation(badge: worst, title: title,
+                            tooltip: tooltips.joined(separator: "\n"), rows: rows)
     }
 }

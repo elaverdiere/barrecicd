@@ -112,6 +112,20 @@ healthy, so that I never work for hours against a CI that is not running.
   colour-blind users and for the menu bar's own monochrome rendering.
 - **AC4** — On launch, before the first poll completes, the item shows a distinct "unknown" state.
   It never shows green until green has been measured.
+- **AC5** — When the tip is uncovered but a previous run IS known, the badge stays grey **and the
+  menu still shows that run's gate table**, under a line naming the uncovered tip and a line naming
+  the run being shown. The colour keeps meaning "nothing is watching this commit"; the table is
+  everything that is nonetheless known.
+
+  Owner's decision, 2026-08-06, watching it grey on his own machine. The two are not in tension:
+  the note above the table says the tip is uncovered, so the table cannot be misread as a verdict
+  on it. And the state is frequent rather than exotic — a pipeline with `paths-ignore` deliberately
+  does not run for a documentation or tooling commit, so the tip legitimately has no run of its own
+  for long stretches, and a menu that went blank each time would train its reader to stop opening it.
+
+  The run number is shown **beside the badge only when that run covers the tip**. "#844" next to a
+  grey dot would suggest 844 has something to say about the code in the editor, which is the precise
+  confusion the grey exists to prevent.
 
 ### F02 — The menu is live while it is open
 
