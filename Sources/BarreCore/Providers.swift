@@ -4,7 +4,7 @@ import Foundation
 /// the watched branch, and what is the newest run. Keeping it to two is what lets a new CI be
 /// supported in an afternoon.
 public protocol Provider: Sendable {
-    func fetch(_ project: ProjectConfig, token: String?, transport: Transport) async -> RunState
+    func fetch(_ project: ProjectConfig, credential: Credential?, transport: Transport) async -> RunState
 }
 
 /// Injected so the providers can be exercised against a stub server (S001 §7, Q3) without a network.
@@ -73,9 +73,9 @@ enum ProviderKit {
 
 public struct GiteaProvider: Provider {
     public init() {}
-    public func fetch(_ p: ProjectConfig, token: String?, transport: Transport) async -> RunState {
+    public func fetch(_ p: ProjectConfig, credential: Credential?, transport: Transport) async -> RunState {
         var h: [String: String] = ["Accept": "application/json"]
-        if let token { h["Authorization"] = "token \(token)" }
+        if let credential { let (k, v) = credential.header(forProvider: "gitea"); h[k] = v }
         var out = RunState(project: p.name)
 
         guard let bURL = URL(string: "\(p.host)/api/v1/repos/\(p.repo)/branches/\(ProviderKit.encode(p.branch))") else {
@@ -85,7 +85,7 @@ public struct GiteaProvider: Provider {
             let (code, data) = try await transport.get(bURL, headers: h)
             guard code == 200, let o = ProviderKit.json(data) as? [String: Any],
                   let commit = o["commit"] as? [String: Any], let id = commit["id"] as? String else {
-                out.unreachable = ProviderKit.failure(p.name, code, hadToken: token != nil); return out
+                out.unreachable = ProviderKit.failure(p.name, code, hadToken: credential != nil); return out
             }
             out.tipSHA = id
         } catch { out.unreachable = "CI host unreachable"; return out }
@@ -111,9 +111,9 @@ public struct GiteaProvider: Provider {
 
 public struct GitHubProvider: Provider {
     public init() {}
-    public func fetch(_ p: ProjectConfig, token: String?, transport: Transport) async -> RunState {
+    public func fetch(_ p: ProjectConfig, credential: Credential?, transport: Transport) async -> RunState {
         var h: [String: String] = ["Accept": "application/vnd.github+json"]
-        if let token { h["Authorization"] = "Bearer \(token)" }
+        if let credential { let (k, v) = credential.header(forProvider: "github"); h[k] = v }
         var out = RunState(project: p.name)
         let host = p.host.isEmpty ? "https://api.github.com" : p.host
 
@@ -123,7 +123,7 @@ public struct GitHubProvider: Provider {
         do {
             let (code, data) = try await transport.get(cURL, headers: h)
             guard code == 200, let o = ProviderKit.json(data) as? [String: Any], let sha = o["sha"] as? String else {
-                out.unreachable = ProviderKit.failure(p.name, code, hadToken: token != nil); return out
+                out.unreachable = ProviderKit.failure(p.name, code, hadToken: credential != nil); return out
             }
             out.tipSHA = sha
         } catch { out.unreachable = "CI host unreachable"; return out }
@@ -146,9 +146,9 @@ public struct GitHubProvider: Provider {
 
 public struct GitLabProvider: Provider {
     public init() {}
-    public func fetch(_ p: ProjectConfig, token: String?, transport: Transport) async -> RunState {
+    public func fetch(_ p: ProjectConfig, credential: Credential?, transport: Transport) async -> RunState {
         var h: [String: String] = ["Accept": "application/json"]
-        if let token { h["PRIVATE-TOKEN"] = token }
+        if let credential { let (k, v) = credential.header(forProvider: "gitlab"); h[k] = v }
         var out = RunState(project: p.name)
         let host = p.host.isEmpty ? "https://gitlab.com" : p.host
         // GitLab wants the project id, or the path FULLY url-encoded including its slashes.
@@ -161,7 +161,7 @@ public struct GitLabProvider: Provider {
             let (code, data) = try await transport.get(bURL, headers: h)
             guard code == 200, let o = ProviderKit.json(data) as? [String: Any],
                   let commit = o["commit"] as? [String: Any], let sha = commit["id"] as? String else {
-                out.unreachable = ProviderKit.failure(p.name, code, hadToken: token != nil); return out
+                out.unreachable = ProviderKit.failure(p.name, code, hadToken: credential != nil); return out
             }
             out.tipSHA = sha
         } catch { out.unreachable = "CI host unreachable"; return out }

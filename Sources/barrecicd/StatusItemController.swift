@@ -88,7 +88,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             // and a handful of projects does not justify the ordering non-determinism.
             for p in snapshot {
                 let run = await Providers.make(p.provider)
-                    .fetch(p, token: Keychain.token(forProject: p.name), transport: transport)
+                    .fetch(p, credential: CredentialStore.resolve(project: p), transport: transport)
                 let ledger = p.ledger.flatMap { LedgerReader.read(directory: $0, logsDirectory: p.logs) }
                 results.append((run, ledger))
             }
@@ -253,7 +253,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         NSWorkspace.shared.open(u)
     }
 
-    @objc private func refreshNow() { loadConfig(); poll() }
+    /// Also drops the cached credentials: "Refresh now" is what a user reaches for after fixing an
+    /// authentication problem, and a refresh that kept serving the credential that had just been
+    /// replaced would make the fix look like it had not worked.
+    @objc private func refreshNow() { CredentialStore.forget(); loadConfig(); poll() }
 
     @objc private func editConfig() {
         writeSampleConfigIfAbsent()
