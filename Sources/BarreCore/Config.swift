@@ -97,12 +97,15 @@ public enum ConfigReader {
     # ledger   : optional. A directory your pipeline writes as it goes; gives the per-gate table.
     # logs     : optional. Where the gates' captured output lives, so a failed row can open it.
 
-    [naql]
+    # If the host is already in your ~/.netrc, or if it is github.com and you use the GitHub CLI,
+    # there is nothing to add: the app reads those stores before asking for anything of its own.
+
+    [my-project]
     provider = gitea
-    host     = http://192.168.0.108:8418
-    repo     = elaverdiere/ocr
+    host     = https://gitea.example.com
+    repo     = owner/repo
     branch   = main
-    ledger   = ~/.cache/naql-ci/live
-    logs     = ~/.cache/naql-ci/logs
+    ledger   = ~/.cache/my-ci/live
+    logs     = ~/.cache/my-ci/logs
     """
 }
