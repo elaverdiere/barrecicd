@@ -229,6 +229,88 @@ struct DeriveTests {
     }
 }
 
+// MARK: - Derivation.derive — F01-AC5 tip uncovered but a previous run is known
+
+@Suite("Derivation.derive — F01-AC5 tip uncovered, previous run known")
+struct AC5UncoveredTipTests {
+
+    /// Both halves of AC5 in one fixture: the badge stays grey (the old code already proved this),
+    /// and the gate table for the known run STILL renders underneath it (this is what regressed).
+    /// The ledger's SHA matches the RUN's head (`apiSHA40`) while the tip (`apiSHA40Diff`) is
+    /// something else entirely — proving the match is against the run's head, never the tip.
+    @Test func ledgerMatchesRunHeadNotTip_showsGateTable_badgeStaysUnknown() {
+        let run = RunState(project: "p", tipSHA: apiSHA40Diff, headSHA: apiSHA40, number: 77, status: .success)
+        let ledger = Ledger(sha: ledgerSHA8, expected: ["build"],
+                             verdicts: ["build": GateVerdict(name: "build", status: .pass, seconds: 10)])
+        let presentation = Derivation.derive(run: run, ledger: ledger, now: fixedNow)
+
+        #expect(presentation.badge == .unknown)
+        #expect(presentation.rows.contains { $0.kind == .gatePassed && $0.label == "build" })
+    }
+
+    /// The two note rows AC5 requires: one naming the uncovered tip, one naming the run being
+    /// displayed — in that order, ahead of the table.
+    @Test func notesNameUncoveredTipAndDisplayedRun_inOrder() {
+        let run = RunState(project: "p", tipSHA: apiSHA40Diff, headSHA: apiSHA40, number: 77, status: .success)
+        let ledger = Ledger(sha: ledgerSHA8, expected: ["build"],
+                             verdicts: ["build": GateVerdict(name: "build", status: .pass, seconds: 10)])
+        let presentation = Derivation.derive(run: run, ledger: ledger, now: fixedNow)
+        let notes = presentation.rows.filter { $0.kind == .note }
+
+        #expect(notes.count == 2)
+        #expect(notes[0].label == "tip aaaaaaaa is covered by no run")
+        #expect(notes[1].label == "last run #77 on 38f64b3b — success")
+    }
+
+    /// Negative control: a ledger whose SHA matches NEITHER the tip nor the run's head still shows
+    /// no table, and names which run it is waiting for — the AC5 notes still fire, but the table
+    /// they sit above stays a "waiting" note instead of gate rows.
+    @Test func ledgerMatchesNeitherTipNorHead_showsNoTable_namesWaitingRun_negativeControl() {
+        let run = RunState(project: "p", tipSHA: apiSHA40Diff, headSHA: apiSHA40, number: 77, status: .success)
+        let ledger = Ledger(sha: "99999999", expected: ["build"],
+                             verdicts: ["build": GateVerdict(name: "build", status: .pass, seconds: 10)])
+        let presentation = Derivation.derive(run: run, ledger: ledger, now: fixedNow)
+
+        #expect(presentation.rows.contains { $0.kind == .gatePassed } == false)
+        #expect(presentation.rows.contains {
+            $0.kind == .note && $0.label == "waiting for run 77 — the ledger on disk is for 99999999"
+        })
+    }
+
+    /// `run.number == nil` (no run has EVER existed on the branch) is a different case: the note
+    /// still names the tip commit — kept from the pre-AC5 test below — and, new to this behaviour,
+    /// no table renders even when a ledger IS on disk, because the derivation returns before ever
+    /// looking at it.
+    @Test func noRunAtAll_ignoresProvidedLedger_showsNoTableEvenThoughLedgerExists() {
+        let run = RunState(project: "p", tipSHA: apiSHA40Diff, headSHA: "", number: nil, status: .unknown)
+        let ledger = Ledger(sha: ledgerSHA8, expected: ["build"],
+                             verdicts: ["build": GateVerdict(name: "build", status: .pass, seconds: 10)])
+        let presentation = Derivation.derive(run: run, ledger: ledger, now: fixedNow)
+
+        #expect(presentation.rows.count == 1)
+        #expect(presentation.rows.contains { $0.kind == .gatePassed } == false)
+        #expect(presentation.tooltip.contains("aaaaaaaa"))
+    }
+
+    /// The run number rides beside the badge only when that run covers the tip.
+    @Test func title_showsRunNumber_whenRunCoversTip() {
+        let run = RunState(project: "p", tipSHA: apiSHA40, headSHA: apiSHA40, number: 99, status: .success)
+        let presentation = Derivation.derive(run: run, ledger: nil, now: fixedNow)
+
+        #expect(presentation.title == "#99")
+    }
+
+    /// Negative control: the identical run number, but the tip is uncovered — the title falls back
+    /// to the project name rather than wearing a number that would suggest the run has something to
+    /// say about the code at the tip.
+    @Test func title_showsProjectName_whenTipUncovered_negativeControl() {
+        let run = RunState(project: "p", tipSHA: apiSHA40Diff, headSHA: apiSHA40, number: 99, status: .success)
+        let presentation = Derivation.derive(run: run, ledger: nil, now: fixedNow)
+
+        #expect(presentation.title == "p")
+    }
+}
+
 // MARK: - Derivation.row — F04-AC1 row states
 
 @Suite("Derivation.row — F04-AC1 row states")
@@ -415,6 +497,19 @@ struct CombineTests {
         let presentation = Derivation.combine([(a, nil)], now: fixedNow)
 
         #expect(presentation.rows.contains { $0.kind == .heading } == false)
+    }
+
+    /// Pinned regression: `combine` must carry each project's OWN tooltip rather than recomputing
+    /// one from scratch. A project with an uncovered tip has a distinctive tooltip phrase
+    /// ("has no run of its own") that a naive recomputation drops; it must survive going through
+    /// `combine` alongside an unrelated second project.
+    @Test func combine_preservesEachProjectsOwnTooltip_forUncoveredTip() {
+        let uncovered = RunState(project: "uncovered-project", tipSHA: apiSHA40Diff, headSHA: apiSHA40,
+                                  number: 77, status: .success)
+        let healthy = RunState(project: "healthy-project", tipSHA: ledgerSHA8, headSHA: apiSHA40, status: .success)
+        let presentation = Derivation.combine([(uncovered, nil), (healthy, nil)], now: fixedNow)
+
+        #expect(presentation.tooltip.contains("uncovered-project: tip aaaaaaaa has no run of its own"))
     }
 }
 
