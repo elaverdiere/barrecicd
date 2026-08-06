@@ -1,9 +1,11 @@
 # Spec — a live CI status bar for macOS
 
-**Status:** draft for a NEW repository. This file is the seed; it should move to that repo as its
-`specs/S001-*.md` and be deleted here once it does.
+**Status:** implemented at **0.1.0 (build 1)**, 2026-08-06. F01, F02, F04, F05 and F06 are in the
+code with 59 unit tests behind the derivation. What is NOT yet proven: the live menu has not been
+watched ticking against a running pipeline — the rule is verified with an injected clock, not on
+screen. §8's side-by-side working day has not happened.
 
-**Working name:** `pulse` (placeholder — a menu-bar item that keeps beating).
+**Name:** `barrecicd`. `pulse` was the placeholder and is retired.
 
 ---
 
@@ -144,10 +146,27 @@ healthy, so that I never work for hours against a CI that is not running.
 
 ### F05 — Credentials are not lying around
 
-- **AC1** — Tokens live in the **Keychain**, one entry per project. Never in the config file, never
-  in the app's preferences, never in a log line.
+- **AC1** — A credential is **never** read from the config file, from the app's preferences, or
+  written to a log line. The config file is meant to be committed; a token in it is a token in your
+  history forever.
 - **AC2** — A rejected token puts the project in **grey with the cause named** ("token refused"),
   never red — an authentication fault is not a verdict on the code.
+- **AC3** — The app resolves a credential from the stores the machine **already has**, in order of
+  how deliberate each one is, and asks for nothing it can already reach:
+  1. the **Keychain** entry created on purpose for this app — an explicit choice, never silently
+     overridden by something found lying around;
+  2. **`~/.netrc`**, keyed on the host from the config — the store `curl` and `git` already use;
+  3. **`gh auth token`**, for `github.com` only — via the CLI, never by parsing its keyring, whose
+     format belongs to `gh` and would break us on its next release.
+
+  Added after the app asked its first user to paste a token for a host that was already in his
+  `~/.netrc`. Asking for a copy multiplies the places one secret lives, and a secret in two stores
+  is a secret that gets rotated in one of them. AC1 keeps its full force: none of these three is
+  the config file.
+- **AC4** — A 404 from a provider that received **no** credential is reported as a missing
+  credential, not as a bad configuration. Measured against a real private Gitea repository: it
+  answers 404 to an unauthenticated caller, deliberately, so that its existence does not leak — so
+  "check host, repo and branch" would send the reader to audit a config file that is correct.
 
 ### F06 — It survives the machine
 
@@ -224,8 +243,14 @@ edit. That is deliberate: the pipeline side is proven and has no reason to churn
 
 ## 9. Open questions for the owner
 
-1. **Name.** `pulse` is a placeholder.
+1. ~~**Name.**~~ **Settled**: `barrecicd`.
 2. **Menu-bar item per project, or one item showing the worst state?** F03-AC2 assumes one item.
    Two projects is fine either way; five would argue for one item.
-3. **Notarisation.** Needed only if the app leaves this machine. It will, if the colleague wants it.
+3. **Notarisation.** Measured 2026-08-06: this machine holds two `Apple Development` certificates
+   and **no** `Developer ID Application`, and no stored `notarytool` profile. So the honest default
+   is what `scripts/make-dmg.sh` does — build the bundle, and REFUSE to wrap it in a disk image that
+   would be rejected on arrival with "the developer cannot be verified". Building from source needs
+   none of this: a binary compiled locally never crosses a quarantine boundary. Distribution needs
+   two account actions only the owner can take (create the certificate in Xcode, store an
+   app-specific password for `notarytool`) — after which the script signs, notarises and staples.
 4. **Does it replace the plugin, or live beside it?** §8 assumes beside, then replace.
