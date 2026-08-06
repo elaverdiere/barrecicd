@@ -89,7 +89,7 @@ public enum ConfigReader {
     # barrecicd — one block per watched project. Tokens are NOT stored here; they live in the
     # Keychain (service "barrecicd", account = the project name below):
     #
-    #   security add-generic-password -s barrecicd -a naql -w '<token>'
+    #   security add-generic-password -s barrecicd -a my-project -w '<token>'
     #
     # provider : gitea | github | gitlab
     # host     : the API root's origin (https://api.github.com for GitHub)

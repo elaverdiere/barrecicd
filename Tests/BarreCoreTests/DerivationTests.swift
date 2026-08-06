@@ -425,10 +425,10 @@ struct ConfigParseTests {
 
     @Test func wellFormedBlock_populatesAllFields() {
         let text = """
-        [naql]
+        [my-project]
         provider = gitea
-        host     = http://192.168.0.108:8418/
-        repo     = elaverdiere/ocr
+        host     = https://ci.example.com:8080/
+        repo     = owner/repo
         branch   = main
         ledger   = ~/.cache/x
         logs     = ~/.cache/y
@@ -436,10 +436,10 @@ struct ConfigParseTests {
         let result = ConfigReader.parse(text)
 
         #expect(result.count == 1)
-        #expect(result[0].name == "naql")
+        #expect(result[0].name == "my-project")
         #expect(result[0].provider == "gitea")
-        #expect(result[0].host == "http://192.168.0.108:8418")   // trailing slash stripped
-        #expect(result[0].repo == "elaverdiere/ocr")
+        #expect(result[0].host == "https://ci.example.com:8080")   // trailing slash stripped
+        #expect(result[0].repo == "owner/repo")
         #expect(result[0].branch == "main")
         #expect(result[0].ledger == "~/.cache/x")
         #expect(result[0].logs == "~/.cache/y")
@@ -447,7 +447,7 @@ struct ConfigParseTests {
 
     @Test func unknownKey_isIgnored_notFatal() {
         let text = """
-        [naql]
+        [my-project]
         provider = gitea
         host = https://example.com
         repo = a/b
@@ -482,7 +482,7 @@ struct ConfigParseTests {
         # a leading comment
         ; a semicolon comment too
 
-        [naql]
+        [my-project]
         # comment inside a block
         host = https://example.com
 
