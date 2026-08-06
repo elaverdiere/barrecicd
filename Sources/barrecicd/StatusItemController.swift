@@ -201,6 +201,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.addItem(login)
 
         menu.addItem(.separator())
+
+        let about = NSMenuItem(title: "About barrecicd", action: #selector(showAbout), keyEquivalent: "")
+        about.target = self
+        menu.addItem(about)
+
         let quit = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
 
@@ -253,6 +258,62 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func editConfig() {
         writeSampleConfigIfAbsent()
         NSWorkspace.shared.open(URL(fileURLWithPath: ConfigReader.defaultPath))
+    }
+
+    /// The About panel says what the tool is FOR, not what it is made of.
+    ///
+    /// A version number and a copyright line would be the conventional content and would tell a
+    /// reader nothing they need. What they need, when they meet a grey dot for the first time, is
+    /// that grey is a real state with a cause — because "nothing is watching" is the failure this
+    /// app exists to name, and it is the only one no notification will ever tell them about.
+    @objc private func showAbout() {
+        // Read from the bundle, never hardcoded here: a version the source claims and the artefact
+        // does not carry is worse than none, because it is quoted in bug reports as if it were true.
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+
+        let body = """
+        A live CI status item for the menu bar.
+
+        ●  green   the tip of your branch has a run, and it passed
+        ✕  red     it has a run, and it failed
+        ◐  blue    a run is in flight
+        ○  grey    nothing is watching
+
+        Grey is why this exists. A notification fires on an event, so it is structurally silent \
+        about the failure that produces none: the runner that exited and was never restarted, the \
+        path filter that swallowed every push, the branch that moved past the last run. In each \
+        case your most recent notification is still green — and still true, about a commit from \
+        three days ago. A badge shows a state rather than an event, so "nothing is watching" gets \
+        a colour of its own, and says which of those three it is instead of guessing.
+
+        Open the menu while a run is in flight and the elapsed times count up under the cursor. \
+        That is the whole reason this is a native app: an NSMenu can be mutated while it is on \
+        screen, and a shell plugin's menu cannot.
+
+        No server, no daemon, no telemetry. Nothing leaves this machine except the calls to the CI \
+        hosts listed in your own configuration file. Tokens live in the Keychain, never in that file.
+
+        Projects:  ~/.config/barrecicd/projects.conf
+        """
+
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = 2
+        let credits = NSAttributedString(string: body, attributes: [
+            .font: NSFont.systemFont(ofSize: 11),
+            .foregroundColor: NSColor.labelColor,
+            .paragraphStyle: style,
+        ])
+
+        // An accessory app has no Dock icon, so the panel would open BEHIND whatever the user is
+        // looking at and read as "the menu item does nothing". Activating first is not politeness.
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "barrecicd",
+            .applicationVersion: version,
+            .version: "build \(build)",
+            .credits: credits,
+        ])
     }
 
     @objc private func toggleLogin() {

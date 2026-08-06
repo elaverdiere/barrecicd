@@ -15,7 +15,19 @@ cd "$(dirname "$0")/.."
 
 APP_NAME="barrecicd"
 BUNDLE_ID="ca.digitaltango.barrecicd"
-VERSION="$(git describe --tags --always 2>/dev/null || echo 0.1.0)"
+# TWO numbers, because they answer two different questions — the same split the author's other app
+# uses, and for the same reason.
+#
+#   VERSION  what a human quotes in a bug report. Hand-bumped, SemVer, and 0.x is a statement:
+#            the thing works and its interface is not promised yet.
+#   BUILD    which build it literally is. Monotonic, never reset, never regressed. Two people can
+#            hold "0.1.0" and disagree about what it does; they cannot disagree about build 1.
+#
+# `git describe` was the first instinct and it is wrong for a shipped artefact: on an untagged tree
+# it yields a commit hash, so two builds of the same release wear different "versions" and neither
+# can be quoted back.
+VERSION="0.1.0"
+BUILD="1"
 OUT="build/${APP_NAME}.app"
 
 echo "── building release"
@@ -39,7 +51,7 @@ cat > "$OUT/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key>        <string>${APP_NAME}</string>
   <key>CFBundlePackageType</key>       <string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
-  <key>CFBundleVersion</key>           <string>${VERSION}</string>
+  <key>CFBundleVersion</key>           <string>${BUILD}</string>
   <key>LSMinimumSystemVersion</key>    <string>14.0</string>
   <!-- The whole product: an agent that lives in the menu bar, with no Dock icon and no window. -->
   <key>LSUIElement</key>               <true/>
