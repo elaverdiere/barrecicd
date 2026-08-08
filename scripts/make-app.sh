@@ -56,6 +56,20 @@ cat > "$OUT/Contents/Info.plist" <<PLIST
   <!-- The whole product: an agent that lives in the menu bar, with no Dock icon and no window. -->
   <key>LSUIElement</key>               <true/>
   <key>NSHighResolutionCapable</key>   <true/>
+  <!-- A self-hosted CI is normally a LAN host reached over plain HTTP (http://192.168.x.x:PORT).
+       App Transport Security blocks cleartext by default, so without this key EVERY poll fails and
+       every project reports .unknown — the badge greys out for a reason that has nothing to do with
+       the CI. Measured 2026-08-07: with no ATS key, two correctly-configured projects with valid
+       tokens both stayed grey. NSAllowsLocalNetworking permits cleartext to local hosts ONLY;
+       public hosts still require HTTPS, so a GitHub/GitLab config loses nothing. -->
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsLocalNetworking</key> <true/>
+  </dict>
+  <!-- macOS 15+ gates local-network access behind user consent, and refuses silently without a
+       purpose string. Same failure shape as above: grey, with no error the user can see. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>barrecicd polls your CI server, which is typically on your local network.</string>
 </dict>
 </plist>
 PLIST
