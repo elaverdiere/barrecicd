@@ -143,8 +143,16 @@ healthy, so that I never work for hours against a CI that is not running.
 
 - **AC1** — Projects are configured in a plain-text file the user can edit and version. No
   proprietary preference blob.
-- **AC2** — With more than one project, the menu-bar item shows the **worst** state across them
-  (grey ≻ red ≻ orange ≻ green), and the menu groups gates under a heading per project.
+- **AC2** — With more than one project, the display is the user's choice, made in the same
+  plain-text file as everything else (`display` in the reserved `[barrecicd]` section):
+  - `display = per-project` (**default**) — **one menu-bar item per project**, each showing its own
+    state and its own gates, each labelled with the project name so two dots are tellable apart.
+  - `display = combined` — a single item showing the **worst** state across them
+    (grey ≻ red ≻ orange ≻ green), its menu grouping gates under a heading per project.
+- **AC2b** — An unknown or missing `display` value falls back to `per-project` rather than
+  failing: the same reason unknown keys are ignored — a typo must not take the indicator down.
+- **AC2c** — In `per-project` mode the items appear in the order the config declares them, and that
+  order does not change between polls. A dot that moves is a dot you have to re-read every time.
 - **AC3** — One misconfigured or unreachable project never suppresses the others' state.
 
 ### F04 — Per-gate detail, when a ledger exists
@@ -258,8 +266,13 @@ edit. That is deliberate: the pipeline side is proven and has no reason to churn
 ## 9. Open questions for the owner
 
 1. ~~**Name.**~~ **Settled**: `barrecicd`.
-2. **Menu-bar item per project, or one item showing the worst state?** F03-AC2 assumes one item.
-   Two projects is fine either way; five would argue for one item.
+2. ~~**Menu-bar item per project, or one item showing the worst state?**~~ **Settled by the owner,
+   2026-08-12: both, and the user picks** — `display = per-project` by default, `combined`
+   available (F03-AC2). What settled it was using it: with two projects and a single combined item,
+   the owner looked at the bar for a second project's state and found no dot for it, because there
+   is none to find by design. An indicator whose answer to "where is my project" is "it is inside
+   the menu of that other dot" has moved the glance it exists to spare. The `combined` mode remains
+   for the five-project case this question anticipated — it is a choice now, not an assumption.
 3. **Notarisation.** Measured 2026-08-06: this machine holds two `Apple Development` certificates
    and **no** `Developer ID Application`, and no stored `notarytool` profile. So the honest default
    is what `scripts/make-dmg.sh` does — build the bundle, and REFUSE to wrap it in a disk image that
