@@ -85,9 +85,22 @@ public enum Derivation {
         // Note this compares against the RUN's head, never the branch tip — which is what lets the
         // table above still appear when the tip is uncovered: the ledger and the run agree with
         // each other, and it is the tip that has moved on.
-        if let ledger, !ledger.sha.isEmpty, !sameCommit(ledger.sha, run.headSHA) {
+        //
+        // An empty ledger SHA is NOT an exemption from that rule, and used to be one. `LedgerReader`
+        // returns "" whenever the `SHA` file is absent or unreadable (Ledger.swift:50), which is the
+        // ordinary state of a directory a CI wrapper has begun writing gates into but has not yet
+        // stamped — a few seconds per run, and forever if the wrapper dies first. A ledger with no
+        // SHA carries no provenance, so it matches nothing; it cannot be the exception that skips
+        // the comparison. Measured 2026-08-07 (S002 §3): a prior run's `build` verdict rendered
+        // under the live run's own number, with no note.
+        if let ledger, !sameCommit(ledger.sha, run.headSHA) {
+            // `sameCommit` is false on an empty string, so the note has to say something better
+            // than "is for " with nothing after it.
+            let provenance = ledger.sha.isEmpty
+                ? "the ledger on disk names no commit"
+                : "the ledger on disk is for \(String(ledger.sha.prefix(8)))"
             rows.append(MenuRow(kind: .note,
-                                label: "waiting for run \(run.number.map(String.init) ?? "?") — the ledger on disk is for \(String(ledger.sha.prefix(8)))"))
+                                label: "waiting for run \(run.number.map(String.init) ?? "?") — \(provenance)"))
         } else if let ledger {
             rows.append(contentsOf: gateRows(ledger, now: now))
         }
@@ -167,6 +180,12 @@ public enum Derivation {
 
     /// One misconfigured project never suppresses the others (F03-AC3): each derives on its own and
     /// only the badge is combined.
+    /// One project's own menu-bar item (F03-AC2, per-project mode).
+    /// Skeleton: compiles, delegates and drops the label. The behaviour lands in the green commit.
+    public static func derivePerProject(run: RunState, ledger: Ledger?, now: Date) -> Presentation {
+        derive(run: run, ledger: ledger, now: now)
+    }
+
     public static func combine(_ results: [(RunState, Ledger?)], now: Date) -> Presentation {
         let several = results.count > 1
         var rows: [MenuRow] = []

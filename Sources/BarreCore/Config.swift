@@ -18,6 +18,14 @@ public struct ProjectConfig: Sendable, Equatable {
     }
 }
 
+/// How several projects occupy the menu bar (F03-AC2). Settled by the owner 2026-08-12.
+public enum DisplayMode: String, Sendable, Equatable {
+    /// One menu-bar item per project — the default.
+    case perProject = "per-project"
+    /// A single item carrying the worst state across them.
+    case combined
+}
+
 public enum ConfigError: Error, CustomStringConvertible {
     case unreadable(String)
     case empty(String)
@@ -72,6 +80,12 @@ public enum ConfigReader {
         }
         flush()
         return out
+    }
+
+    /// Skeleton: compiles, always answers the default. The behaviour lands in the green commit.
+    public static func parseDisplay(_ text: String) -> DisplayMode {
+        _ = text
+        return .perProject
     }
 
     public static func load(path: String? = nil) throws -> [ProjectConfig] {
