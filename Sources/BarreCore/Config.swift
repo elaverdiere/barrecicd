@@ -82,9 +82,32 @@ public enum ConfigReader {
         return out
     }
 
-    /// Skeleton: compiles, always answers the default. The behaviour lands in the green commit.
+    /// The one global setting, read from the reserved `[barrecicd]` section (F03-AC2).
+    ///
+    /// It lives in the same file as the projects because F03-AC1 is about ONE plain-text file a
+    /// user can diff and commit; a second store for one key would be the preferences blob that
+    /// criterion refuses. The section is reserved rather than special-cased: `parse` already drops
+    /// any section without `repo`/`host`, so an older build reading this file sees no phantom
+    /// project — the format stayed backward compatible by construction, not by promise.
+    ///
+    /// An unknown value falls back to the default (AC2b) for the reason unknown KEYS are ignored:
+    /// a typo must not take the indicator down, which is the outage it exists to report.
     public static func parseDisplay(_ text: String) -> DisplayMode {
-        _ = text
+        var inReserved = false
+        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.isEmpty || line.hasPrefix("#") || line.hasPrefix(";") { continue }
+            if line.hasPrefix("[") && line.hasSuffix("]") {
+                let name = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+                inReserved = name.lowercased() == "barrecicd"
+                continue
+            }
+            guard inReserved, let eq = line.firstIndex(of: "=") else { continue }
+            let k = line[line.startIndex..<eq].trimmingCharacters(in: .whitespaces).lowercased()
+            guard k == "display" else { continue }
+            let v = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces).lowercased()
+            return DisplayMode(rawValue: v) ?? .perProject
+        }
         return .perProject
     }
 

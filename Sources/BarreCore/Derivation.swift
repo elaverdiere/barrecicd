@@ -181,9 +181,15 @@ public enum Derivation {
     /// One misconfigured project never suppresses the others (F03-AC3): each derives on its own and
     /// only the badge is combined.
     /// One project's own menu-bar item (F03-AC2, per-project mode).
-    /// Skeleton: compiles, delegates and drops the label. The behaviour lands in the green commit.
+    ///
+    /// Same derivation as everywhere else — the state of one project was never the aggregate's
+    /// business — with the project's name added to the bar title. Without the name, two dots side
+    /// by side are two anonymous colours and the glance costs a menu open, which is the cost this
+    /// tool exists to remove. The menu keeps its heading off: the item is already the heading.
     public static func derivePerProject(run: RunState, ledger: Ledger?, now: Date) -> Presentation {
-        derive(run: run, ledger: ledger, now: now)
+        let base = derive(run: run, ledger: ledger, now: now)
+        let label = base.title.isEmpty ? run.project : "\(run.project) \(base.title)"
+        return Presentation(badge: base.badge, title: label, tooltip: base.tooltip, rows: base.rows)
     }
 
     public static func combine(_ results: [(RunState, Ledger?)], now: Date) -> Presentation {
